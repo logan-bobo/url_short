@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,11 +16,19 @@ func TestHealthEndpoint(t *testing.T){
 
 		apiCfg.healthz(response, request)
 
-		got := response.Body.String()
-		want := `{"status":"ok"}`
+		got := HealthResponse{}
+		err := json.NewDecoder(response.Body).Decode(&got)
 
-		if got != want {
-			t.Errorf("got %q wanted %q", got, want)
+		if err != nil {
+			t.Errorf("unable to parse response %q into %q", response.Body, got)
+		}
+		
+		if got.Status != "ok" {
+			t.Errorf("status field must be okay on health response got %q wanted %q", got.Status, "ok")
+		}
+
+		if response.Result().StatusCode != http.StatusOK {
+			t.Error("endpoint must return 200")
 		}
 	})
 }
