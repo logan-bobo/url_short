@@ -1,9 +1,37 @@
 version: '3.1'
 
 services:
-  url-short:
+  api:
     image: url-short:latest
     env_file:
       - .env
     ports:
       - 5001:8080
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost/api/v1/healthz || exit 1
+      interval: 2s
+      retries: 5
+      timeout: 10s
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    user: postgres
+    volumes:
+      -  pgdata:/var/lib/postgresql/data
+      -  ./bin/local-init.sql:/docker-entrypoint-initdb.d/local-init.sql
+    ports:
+      - 5002:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+volumes:
+  pgdata:
