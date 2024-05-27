@@ -27,3 +27,5 @@ test:
 		docker run -t "url-short:test"
 .PHONY:test
 
+migrate: 
+		goose postgres "postgres://url-short:password@localhost:5002/url-short" up 
