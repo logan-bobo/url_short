@@ -28,4 +28,5 @@ test:
 .PHONY:test
 
 migrate: 
-		goose postgres "postgres://url-short:password@localhost:5002/url-short" up 
+		goose -dir sql/schema postgres "postgres://url_short:password@localhost:5002/url_short" up 
+.PHONY:migrate
