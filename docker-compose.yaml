@@ -7,6 +7,11 @@ services:
       - .env
     ports:
       - 5001:8080
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost/api/v1/healthz || exit 1
+      interval: 2s
+      retries: 5
+      timeout: 10s
     depends_on:
       db:
         condition: service_healthy
@@ -15,10 +20,12 @@ services:
     restart: always
     environment:
       PGDATA: /var/lib/postgresql/data/pgdata
-      PGUSER: url-short
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
+    user: postgres
     volumes:
       -  pgdata:/var/lib/postgresql/data
+      -  ./bin/local-init.sql:/docker-entrypoint-initdb.d/local-init.sql
     ports:
       - 5002:5432
     healthcheck:

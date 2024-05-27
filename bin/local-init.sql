@@ -1,0 +1,7 @@
+CREATE ROLE url_short WITH 
+CREATEDB
+LOGIN
+PASSWORD 'password';
+
+CREATE DATABASE url_short WITH 
+OWNER url_short;
