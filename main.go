@@ -1,11 +1,13 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
-	"database/sql"
 	"url-short/internal/database"
+
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -32,7 +34,7 @@ func main() {
 	}
 
 	mux.HandleFunc("GET /api/v1/healthz", apiCfg.healthz)
-	mux.HandleFunc("POST /api/v1/data/shorten", apiCfg.POSTLongURL)
+	mux.HandleFunc("POST /api/v1/data/shorten", apiCfg.postLongURL)
 
 	log.Printf("Serving port : %v \n", serverPort)
 	log.Fatal(server.ListenAndServe())

@@ -1,6 +1,6 @@
 -- +goose Up
 CREATE TABLE urls (
-		id integer PRIMARY KEY,
+		id SERIAL PRIMARY KEY,
 		short_url VARCHAR(100) UNIQUE NOT NULL,
 		long_url VARCHAR(300) UNIQUE NOT NULL,
 		created_at TIMESTAMP NOT NULL,
