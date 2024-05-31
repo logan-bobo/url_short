@@ -10,7 +10,7 @@ func respondWithJSON(w http.ResponseWriter, status int, payload interface{}) {
 	data, err := json.Marshal(payload)
 
 	if err != nil {
-		log.Printf("can not Marshal payload %v", payload)
+		log.Printf("can not marshal payload %v", payload)
 		return
 	}
 
