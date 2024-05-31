@@ -43,7 +43,7 @@ func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&payload)
 
 	if err != nil {
-		respondWithError(w, 400, "incorrect request fromat")
+		respondWithError(w, http.StatusBadRequest, "incorrect request fromat")
 		return
 	}
 
@@ -51,7 +51,7 @@ func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Println(err)
-		respondWithError(w, 400, "could not parse request URL")
+		respondWithError(w, http.StatusBadRequest, "could not parse request URL")
 		return
 	}
 
@@ -59,7 +59,7 @@ func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Println(err)
-		respondWithError(w, 500, "could not resolve hash collision")
+		respondWithError(w, http.StatusInternalServerError, "could not resolve hash collision")
 	}
 
 	now := time.Now()
@@ -72,11 +72,11 @@ func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Println(err)
-		respondWithError(w, 500, "could not create short URL in database")
+		respondWithError(w, http.StatusInternalServerError, "could not create short URL in database")
 		return
 	}
 
-	respondWithJSON(w, 201, POSTLongURLResponse{
+	respondWithJSON(w, http.StatusCreated, POSTLongURLResponse{
 		ShortURL: shortenedURL.ShortUrl,
 	})
 }
@@ -98,4 +98,18 @@ func hashCollisionDetection(DB *database.Queries, url string, count int, request
 	count++
 
 	return hashCollisionDetection(DB, url, count, requestContext)
+}
+
+func (apiCfg *apiConfig) getShortURL(w http.ResponseWriter, r *http.Request) {
+	query := r.PathValue("shortUrl")
+
+	row, err := apiCfg.DB.SelectURL(r.Context(), query)
+
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+
+	http.Redirect(w, r, row.LongUrl, http.StatusMovedPermanently)
 }
