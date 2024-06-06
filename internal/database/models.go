@@ -15,3 +15,11 @@ type Url struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+type User struct {
+	ID        int32
+	Email     string
+	Password  string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
