@@ -38,6 +38,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/{shortUrl}", apiCfg.getShortURL)
 
 	mux.HandleFunc("POST /api/v1/users", apiCfg.postAPIUsers)
+	mux.HandleFunc("POST /api/v1/login", apiCfg.postAPILogin)
 
 	log.Printf("Serving port : %v \n", serverPort)
 	log.Fatal(server.ListenAndServe())
