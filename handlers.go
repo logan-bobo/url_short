@@ -33,7 +33,7 @@ type POSTLongURLResponse struct {
 	ShortURL string `json:"short_url"`
 }
 
-type POSTAPIUsers struct {
+type POSTAPIUser struct {
 	Email string `json:"email"`
 	Password string `json:"Password"`
 }
@@ -129,7 +129,7 @@ func (apiCfg *apiConfig) getShortURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (apiCfg *apiConfig) postAPIUsers(w http.ResponseWriter, r *http.Request) {
-	payload := POSTAPIUsers{}
+	payload := POSTAPIUser{}
 
 	err := json.NewDecoder(r.Body).Decode(&payload)
 
@@ -169,3 +169,40 @@ func (apiCfg *apiConfig) postAPIUsers(w http.ResponseWriter, r *http.Request) {
 		Email: user.Email,
 	})	
 }
+
+func (apiCfg *apiConfig) postAPILogin(w http.ResponseWriter, r *http.Request) {
+	payload := POSTAPIUser{}
+
+	err := json.NewDecoder(r.Body).Decode(&payload)
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid parameters for login")
+		return
+	}
+
+	user, err := apiCfg.DB.SelectUser(r.Context(), payload.Email)
+
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "could not find user")
+		return
+	}
+
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, http.StatusInternalServerError, "database error")
+		return
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(payload.Password))
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid password")
+		return
+	}
+
+	respondWithJSON(w, http.StatusFound, POSTAPIUsersResponse{
+		ID: user.ID,
+		Email: user.Email,
+	})
+}
+
