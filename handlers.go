@@ -4,13 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"time"
 
 	"url-short/internal/database"
 	"url-short/internal/shortener"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type apiConfig struct {
@@ -27,6 +31,16 @@ type POSTLongURLRequest struct {
 
 type POSTLongURLResponse struct {
 	ShortURL string `json:"short_url"`
+}
+
+type POSTAPIUsers struct {
+	Email string `json:"email"`
+	Password string `json:"Password"`
+}
+
+type POSTAPIUsersResponse struct {
+	ID int32 `json:"id"`
+	Email string `json:"email"`
 }
 
 func (apiCfg *apiConfig) healthz(w http.ResponseWriter, r *http.Request) {
@@ -112,4 +126,46 @@ func (apiCfg *apiConfig) getShortURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, row.LongUrl, http.StatusMovedPermanently)
+}
+
+func (apiCfg *apiConfig) postAPIUsers(w http.ResponseWriter, r *http.Request) {
+	payload := POSTAPIUsers{}
+
+	err := json.NewDecoder(r.Body).Decode(&payload)
+
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, http.StatusBadRequest, "incorrect parameters for user creation")
+		return
+	}
+
+	_, err = mail.ParseAddress(payload.Email)
+
+	if err != nil {
+		fmt.Println(err)
+		respondWithError(w, http.StatusBadRequest, "invalid email address")
+		return	
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(payload.Password), bcrypt.DefaultCost)
+
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, http.StatusBadRequest, "bad password supplied from client")
+		return
+	}
+
+	now := time.Now()
+
+	user, err := apiCfg.DB.CreateUser(r.Context(), database.CreateUserParams{
+		Email: payload.Email,
+		Password: string(passwordHash),
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+	
+	respondWithJSON(w, http.StatusCreated, POSTAPIUsersResponse{
+		ID: user.ID, 
+		Email: user.Email,
+	})	
 }
