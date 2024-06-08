@@ -13,6 +13,7 @@ import (
 func main() {
 	serverPort := os.Getenv("SERVER_PORT")
 	dbURL := os.Getenv("PG_CONN")
+	jwtSecret := os.Getenv("JWT_SECRET")
 
 	db, err := sql.Open("postgres", dbURL)
 
@@ -30,14 +31,20 @@ func main() {
 	}
 
 	apiCfg := apiConfig{
-		DB: dbQueries,
+		DB:        dbQueries,
+		JWTSecret: jwtSecret,
 	}
 
+	// utility endpoints
 	mux.HandleFunc("GET /api/v1/healthz", apiCfg.healthz)
+
+	// url management endpoints
 	mux.HandleFunc("POST /api/v1/data/shorten", apiCfg.postLongURL)
 	mux.HandleFunc("GET /api/v1/{shortUrl}", apiCfg.getShortURL)
 
+	// user management endpoints
 	mux.HandleFunc("POST /api/v1/users", apiCfg.postAPIUsers)
+	mux.HandleFunc("PUT /api/v1/users", apiCfg.authenticationMiddlewear(apiCfg.putAPIUsers))
 	mux.HandleFunc("POST /api/v1/login", apiCfg.postAPILogin)
 
 	log.Printf("Serving port : %v \n", serverPort)

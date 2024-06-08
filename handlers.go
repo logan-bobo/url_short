@@ -9,37 +9,46 @@ import (
 	"net/http"
 	"net/mail"
 	"net/url"
+	"strconv"
 	"time"
 
 	"url-short/internal/database"
 	"url-short/internal/shortener"
 
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type apiConfig struct {
-	DB *database.Queries
+	DB        *database.Queries
+	JWTSecret string
 }
 
 type HealthResponse struct {
 	Status string `json:"status"`
 }
 
-type POSTLongURLRequest struct {
+type LongURLRequest struct {
 	LongURL string `json:"long_url"`
 }
 
-type POSTLongURLResponse struct {
+type LongURLResponse struct {
 	ShortURL string `json:"short_url"`
 }
 
-type POSTAPIUser struct {
-	Email string `json:"email"`
+type APIUserRequest struct {
+	Email    string `json:"email"`
 	Password string `json:"Password"`
 }
 
-type POSTAPIUsersResponse struct {
-	ID int32 `json:"id"`
+type APIUsersResponse struct {
+	ID    int32  `json:"id"`
+	Email string `json:"email"`
+	Token string `json:"token"`
+}
+
+type APIUserResponseNoToken struct {
+	ID    int32  `json:"id"`
 	Email string `json:"email"`
 }
 
@@ -52,7 +61,7 @@ func (apiCfg *apiConfig) healthz(w http.ResponseWriter, r *http.Request) {
 }
 
 func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request) {
-	payload := POSTLongURLRequest{}
+	payload := LongURLRequest{}
 
 	err := json.NewDecoder(r.Body).Decode(&payload)
 
@@ -90,7 +99,7 @@ func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, http.StatusCreated, POSTLongURLResponse{
+	respondWithJSON(w, http.StatusCreated, LongURLResponse{
 		ShortURL: shortenedURL.ShortUrl,
 	})
 }
@@ -129,7 +138,7 @@ func (apiCfg *apiConfig) getShortURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (apiCfg *apiConfig) postAPIUsers(w http.ResponseWriter, r *http.Request) {
-	payload := POSTAPIUser{}
+	payload := APIUserRequest{}
 
 	err := json.NewDecoder(r.Body).Decode(&payload)
 
@@ -144,7 +153,7 @@ func (apiCfg *apiConfig) postAPIUsers(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println(err)
 		respondWithError(w, http.StatusBadRequest, "invalid email address")
-		return	
+		return
 	}
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(payload.Password), bcrypt.DefaultCost)
@@ -158,20 +167,20 @@ func (apiCfg *apiConfig) postAPIUsers(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 
 	user, err := apiCfg.DB.CreateUser(r.Context(), database.CreateUserParams{
-		Email: payload.Email,
-		Password: string(passwordHash),
+		Email:     payload.Email,
+		Password:  string(passwordHash),
 		CreatedAt: now,
 		UpdatedAt: now,
 	})
-	
-	respondWithJSON(w, http.StatusCreated, POSTAPIUsersResponse{
-		ID: user.ID, 
+
+	respondWithJSON(w, http.StatusCreated, APIUserResponseNoToken{
+		ID:    user.ID,
 		Email: user.Email,
-	})	
+	})
 }
 
 func (apiCfg *apiConfig) postAPILogin(w http.ResponseWriter, r *http.Request) {
-	payload := POSTAPIUser{}
+	payload := APIUserRequest{}
 
 	err := json.NewDecoder(r.Body).Decode(&payload)
 
@@ -200,9 +209,60 @@ func (apiCfg *apiConfig) postAPILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, http.StatusFound, POSTAPIUsersResponse{
-		ID: user.ID,
+	registeredClaims := jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		Issuer:    "url-short-auth",
+		Subject:   strconv.Itoa(int(user.ID)),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, registeredClaims)
+
+	signedToken, err := token.SignedString([]byte(apiCfg.JWTSecret))
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "can not create JWT")
+		return
+	}
+
+	respondWithJSON(w, http.StatusFound, APIUsersResponse{
+		ID:    user.ID,
 		Email: user.Email,
+		Token: signedToken,
 	})
 }
 
+func (apiCfg *apiConfig) putAPIUsers(w http.ResponseWriter, r *http.Request, user database.User) {
+	payload := APIUserRequest{}
+
+	err := json.NewDecoder(r.Body).Decode(&payload)
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "incorrect parameters for user update request")
+		return
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(payload.Password), bcrypt.DefaultCost)
+
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, http.StatusBadRequest, "bad password supplied from client")
+		return
+	}
+
+	err = apiCfg.DB.UpdateUser(r.Context(), database.UpdateUserParams{
+		Email:    payload.Email,
+		Password: string(passwordHash),
+		ID:       user.ID,
+		UpdatedAt: time.Now(),
+	})
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not update user in database")
+	}
+
+	respondWithJSON(w, http.StatusOK, APIUserResponseNoToken{
+		Email: payload.Email,
+		ID:    user.ID,
+	})
+}
