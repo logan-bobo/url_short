@@ -59,3 +59,45 @@ func (q *Queries) SelectUser(ctx context.Context, email string) (User, error) {
 	)
 	return i, err
 }
+
+const selectUserByID = `-- name: SelectUserByID :one
+SELECT id, email, password, created_at, updated_at
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) SelectUserByID(ctx context.Context, id int32) (User, error) {
+	row := q.db.QueryRowContext(ctx, selectUserByID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Password,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateUser = `-- name: UpdateUser :exec
+UPDATE users
+SET email = $1, password = $2, updated_at = $3
+WHERE id = $4
+`
+
+type UpdateUserParams struct {
+	Email     string
+	Password  string
+	UpdatedAt time.Time
+	ID        int32
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
+	_, err := q.db.ExecContext(ctx, updateUser,
+		arg.Email,
+		arg.Password,
+		arg.UpdatedAt,
+		arg.ID,
+	)
+	return err
+}
