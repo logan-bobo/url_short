@@ -5,6 +5,7 @@
 package database
 
 import (
+	"database/sql"
 	"time"
 )
 
@@ -14,12 +15,15 @@ type Url struct {
 	LongUrl   string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	UserID    int32
 }
 
 type User struct {
-	ID        int32
-	Email     string
-	Password  string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID                     int32
+	Email                  string
+	Password               string
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+	RefreshToken           sql.NullString
+	RefreshTokenRevokeDate sql.NullTime
 }
