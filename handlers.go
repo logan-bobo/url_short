@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,6 +12,7 @@ import (
 	"net/mail"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"url-short/internal/database"
@@ -42,8 +45,13 @@ type APIUserRequest struct {
 }
 
 type APIUsersResponse struct {
-	ID    int32  `json:"id"`
-	Email string `json:"email"`
+	ID           int32  `json:"id"`
+	Email        string `json:"email"`
+	Token        string `json:"token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+type APIUsersRefreshResponse struct {
 	Token string `json:"token"`
 }
 
@@ -60,7 +68,7 @@ func (apiCfg *apiConfig) healthz(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, payload)
 }
 
-func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request) {
+func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request, user database.User) {
 	payload := LongURLRequest{}
 
 	err := json.NewDecoder(r.Body).Decode(&payload)
@@ -83,6 +91,7 @@ func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err)
 		respondWithError(w, http.StatusInternalServerError, "could not resolve hash collision")
+		return
 	}
 
 	now := time.Now()
@@ -91,6 +100,7 @@ func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request) {
 		ShortUrl:  shortURLHash,
 		CreatedAt: now,
 		UpdatedAt: now,
+		UserID:    user.ID,
 	})
 
 	if err != nil {
@@ -210,7 +220,7 @@ func (apiCfg *apiConfig) postAPILogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	registeredClaims := jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		Issuer:    "url-short-auth",
 		Subject:   strconv.Itoa(int(user.ID)),
@@ -225,10 +235,32 @@ func (apiCfg *apiConfig) postAPILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	byteSlice := make([]byte, 32)
+	_, err = rand.Read(byteSlice)
+	refreshToken := hex.EncodeToString(byteSlice)
+
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, http.StatusInternalServerError, "can not generate refresh token")
+		return
+	}
+
+	err = apiCfg.DB.UserTokenRefresh(r.Context(), database.UserTokenRefreshParams{
+		RefreshToken:           sql.NullString{String: refreshToken, Valid: true},
+		RefreshTokenRevokeDate: sql.NullTime{Time: time.Now().Add(60 * (24 * time.Hour)), Valid: true},
+		ID:                     user.ID,
+	})
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "can not update user with refresh token")
+		return
+	}
+
 	respondWithJSON(w, http.StatusFound, APIUsersResponse{
-		ID:    user.ID,
-		Email: user.Email,
-		Token: signedToken,
+		ID:           user.ID,
+		Email:        user.Email,
+		Token:        signedToken,
+		RefreshToken: refreshToken,
 	})
 }
 
@@ -251,9 +283,9 @@ func (apiCfg *apiConfig) putAPIUsers(w http.ResponseWriter, r *http.Request, use
 	}
 
 	err = apiCfg.DB.UpdateUser(r.Context(), database.UpdateUserParams{
-		Email:    payload.Email,
-		Password: string(passwordHash),
-		ID:       user.ID,
+		Email:     payload.Email,
+		Password:  string(passwordHash),
+		ID:        user.ID,
 		UpdatedAt: time.Now(),
 	})
 
@@ -264,5 +296,61 @@ func (apiCfg *apiConfig) putAPIUsers(w http.ResponseWriter, r *http.Request, use
 	respondWithJSON(w, http.StatusOK, APIUserResponseNoToken{
 		Email: payload.Email,
 		ID:    user.ID,
+	})
+}
+
+func (apiCfg *apiConfig) postAPIRefresh(w http.ResponseWriter, r *http.Request) {
+	// We handle the Auth header in two places if we do this a third time pull this out into a general Auth header
+	// processing function
+	authHeader := r.Header.Get("Authorization")
+
+	if authHeader == "" {
+		respondWithError(w, http.StatusBadRequest, "no auth header supplied")
+		return
+	}
+
+	splitAuth := strings.Split(authHeader, " ")
+
+	if len(splitAuth) == 0 {
+		respondWithError(w, http.StatusBadRequest, "empty auth header")
+	}
+
+	if len(splitAuth) != 2 && splitAuth[0] != "Bearer" {
+		respondWithError(w, http.StatusBadRequest, "invalid paremeters")
+	}
+
+	requestToken := splitAuth[1]
+
+	user, err := apiCfg.DB.SelectUserByRefreshToken(r.Context(), sql.NullString{String: requestToken, Valid: true})
+
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "can not refresh token no user found")
+		return
+	}
+
+	if time.Now().After(user.RefreshTokenRevokeDate.Time) {
+		respondWithError(w, http.StatusUnauthorized, "refresh token expired, please login again")
+		return
+	}
+
+	// TODO: We do this twice in the codebase, if we do it a third time pull this out to a general JWT issue function
+	registeredClaims := jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		Issuer:    "url-short-auth",
+		Subject:   strconv.Itoa(int(user.ID)),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, registeredClaims)
+
+	signedToken, err := token.SignedString([]byte(apiCfg.JWTSecret))
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "can not create JWT")
+		return
+	}
+
+	respondWithJSON(w, http.StatusCreated, APIUsersRefreshResponse{
+		Token: signedToken,
 	})
 }

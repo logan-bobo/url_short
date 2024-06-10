@@ -11,9 +11,9 @@ import (
 )
 
 const createURL = `-- name: CreateURL :one
-INSERT INTO urls (short_url, long_url, created_at, updated_at)
-VALUES ($1, $2, $3, $4)
-RETURNING id, short_url, long_url, created_at, updated_at
+INSERT INTO urls (short_url, long_url, created_at, updated_at, user_id)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, short_url, long_url, created_at, updated_at, user_id
 `
 
 type CreateURLParams struct {
@@ -21,6 +21,7 @@ type CreateURLParams struct {
 	LongUrl   string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	UserID    int32
 }
 
 func (q *Queries) CreateURL(ctx context.Context, arg CreateURLParams) (Url, error) {
@@ -29,6 +30,7 @@ func (q *Queries) CreateURL(ctx context.Context, arg CreateURLParams) (Url, erro
 		arg.LongUrl,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+		arg.UserID,
 	)
 	var i Url
 	err := row.Scan(
@@ -37,12 +39,13 @@ func (q *Queries) CreateURL(ctx context.Context, arg CreateURLParams) (Url, erro
 		&i.LongUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UserID,
 	)
 	return i, err
 }
 
 const selectURL = `-- name: SelectURL :one
-SELECT id, short_url, long_url, created_at, updated_at 
+SELECT id, short_url, long_url, created_at, updated_at, user_id 
 FROM urls
 WHERE short_url = $1
 `
@@ -56,6 +59,7 @@ func (q *Queries) SelectURL(ctx context.Context, shortUrl string) (Url, error) {
 		&i.LongUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UserID,
 	)
 	return i, err
 }

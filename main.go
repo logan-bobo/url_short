@@ -39,13 +39,14 @@ func main() {
 	mux.HandleFunc("GET /api/v1/healthz", apiCfg.healthz)
 
 	// url management endpoints
-	mux.HandleFunc("POST /api/v1/data/shorten", apiCfg.postLongURL)
+	mux.HandleFunc("POST /api/v1/data/shorten", apiCfg.authenticationMiddlewear(apiCfg.postLongURL))
 	mux.HandleFunc("GET /api/v1/{shortUrl}", apiCfg.getShortURL)
 
 	// user management endpoints
 	mux.HandleFunc("POST /api/v1/users", apiCfg.postAPIUsers)
 	mux.HandleFunc("PUT /api/v1/users", apiCfg.authenticationMiddlewear(apiCfg.putAPIUsers))
 	mux.HandleFunc("POST /api/v1/login", apiCfg.postAPILogin)
+	mux.HandleFunc("POST /api/v1/refresh", apiCfg.postAPIRefresh)
 
 	log.Printf("Serving port : %v \n", serverPort)
 	log.Fatal(server.ListenAndServe())
