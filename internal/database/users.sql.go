@@ -7,13 +7,14 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password, created_at, updated_at)
 VALUES ($1, $2, $3, $4)
-RETURNING id, email, password, created_at, updated_at
+RETURNING id, email, password, created_at, updated_at, refresh_token, refresh_token_revoke_date
 `
 
 type CreateUserParams struct {
@@ -37,12 +38,14 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Password,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RefreshToken,
+		&i.RefreshTokenRevokeDate,
 	)
 	return i, err
 }
 
 const selectUser = `-- name: SelectUser :one
-SELECT id, email, password, created_at, updated_at
+SELECT id, email, password, created_at, updated_at, refresh_token, refresh_token_revoke_date
 FROM users
 WHERE email = $1
 `
@@ -56,12 +59,14 @@ func (q *Queries) SelectUser(ctx context.Context, email string) (User, error) {
 		&i.Password,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RefreshToken,
+		&i.RefreshTokenRevokeDate,
 	)
 	return i, err
 }
 
 const selectUserByID = `-- name: SelectUserByID :one
-SELECT id, email, password, created_at, updated_at
+SELECT id, email, password, created_at, updated_at, refresh_token, refresh_token_revoke_date
 FROM users
 WHERE id = $1
 `
@@ -75,6 +80,29 @@ func (q *Queries) SelectUserByID(ctx context.Context, id int32) (User, error) {
 		&i.Password,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RefreshToken,
+		&i.RefreshTokenRevokeDate,
+	)
+	return i, err
+}
+
+const selectUserByRefreshToken = `-- name: SelectUserByRefreshToken :one
+SELECT id, email, password, created_at, updated_at, refresh_token, refresh_token_revoke_date
+FROM users
+WHERE refresh_token = $1
+`
+
+func (q *Queries) SelectUserByRefreshToken(ctx context.Context, refreshToken sql.NullString) (User, error) {
+	row := q.db.QueryRowContext(ctx, selectUserByRefreshToken, refreshToken)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Password,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.RefreshToken,
+		&i.RefreshTokenRevokeDate,
 	)
 	return i, err
 }
@@ -99,5 +127,22 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 		arg.UpdatedAt,
 		arg.ID,
 	)
+	return err
+}
+
+const userTokenRefresh = `-- name: UserTokenRefresh :exec
+UPDATE users
+SET refresh_token = $1, refresh_token_revoke_date = $2
+WHERE id = $3
+`
+
+type UserTokenRefreshParams struct {
+	RefreshToken           sql.NullString
+	RefreshTokenRevokeDate sql.NullTime
+	ID                     int32
+}
+
+func (q *Queries) UserTokenRefresh(ctx context.Context, arg UserTokenRefreshParams) error {
+	_, err := q.db.ExecContext(ctx, userTokenRefresh, arg.RefreshToken, arg.RefreshTokenRevokeDate, arg.ID)
 	return err
 }
