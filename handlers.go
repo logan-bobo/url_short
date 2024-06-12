@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -15,11 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"url-short/internal/database"
-	"url-short/internal/shortener"
-
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+
+	"url-short/internal/database"
 )
 
 type apiConfig struct {
@@ -114,25 +112,6 @@ func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request, use
 	})
 }
 
-func hashCollisionDetection(DB *database.Queries, url string, count int, requestContext context.Context) (string, error) {
-	hashURL := shortener.Hash(url, count)
-	shortURLHash := shortener.Shorten(hashURL)
-
-	_, err := DB.SelectURL(requestContext, shortURLHash)
-
-	if err == sql.ErrNoRows {
-		return shortURLHash, nil
-	}
-
-	if err != nil && err != sql.ErrNoRows {
-		return "", err
-	}
-
-	count++
-
-	return hashCollisionDetection(DB, url, count, requestContext)
-}
-
 func (apiCfg *apiConfig) getShortURL(w http.ResponseWriter, r *http.Request) {
 	query := r.PathValue("shortUrl")
 
@@ -145,6 +124,27 @@ func (apiCfg *apiConfig) getShortURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, row.LongUrl, http.StatusMovedPermanently)
+}
+
+func (apiCfg *apiConfig) deleteShortURL(w http.ResponseWriter, r * http.Request, user database.User) {
+	query := r.PathValue("shortUrl")
+
+	if query == "" {
+		respondWithError(w, http.StatusBadRequest, "no short url supplied")
+		return
+	}
+
+	err := apiCfg.DB.DeleteURL(r.Context(), database.DeleteURLParams{
+		UserID: user.ID,
+		ShortUrl: query,
+	})
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest,  "could not delete short url")
+		return 
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (apiCfg *apiConfig) postAPIUsers(w http.ResponseWriter, r *http.Request) {

@@ -7,3 +7,8 @@ RETURNING *;
 SELECT * 
 FROM urls
 WHERE short_url = $1;
+
+-- name: DeleteURL :exec
+DELETE FROM urls
+WHERE user_id = $1 AND 
+short_url = $2;
