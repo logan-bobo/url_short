@@ -7,3 +7,14 @@ RETURNING *;
 SELECT * 
 FROM urls
 WHERE short_url = $1;
+
+-- name: DeleteURL :exec
+DELETE FROM urls
+WHERE user_id = $1 AND 
+short_url = $2;
+
+-- name: UpdateShortURL :exec
+UPDATE urls
+SET long_url = $1
+WHERE user_id = $2 AND 
+short_url = $3;
