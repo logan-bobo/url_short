@@ -37,6 +37,11 @@ type LongURLResponse struct {
 	ShortURL string `json:"short_url"`
 }
 
+type ShortURLUpdateResponse struct {
+	ShortURL string `json:"short_url"`
+	LongURL  string `json:"long_url"`
+}
+
 type APIUserRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"Password"`
@@ -115,6 +120,11 @@ func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request, use
 func (apiCfg *apiConfig) getShortURL(w http.ResponseWriter, r *http.Request) {
 	query := r.PathValue("shortUrl")
 
+	if query == "" {
+		respondWithError(w, http.StatusBadRequest, "no short url supplied")
+		return
+	}
+
 	row, err := apiCfg.DB.SelectURL(r.Context(), query)
 
 	if err != nil {
@@ -126,7 +136,7 @@ func (apiCfg *apiConfig) getShortURL(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, row.LongUrl, http.StatusMovedPermanently)
 }
 
-func (apiCfg *apiConfig) deleteShortURL(w http.ResponseWriter, r * http.Request, user database.User) {
+func (apiCfg *apiConfig) deleteShortURL(w http.ResponseWriter, r *http.Request, user database.User) {
 	query := r.PathValue("shortUrl")
 
 	if query == "" {
@@ -135,16 +145,50 @@ func (apiCfg *apiConfig) deleteShortURL(w http.ResponseWriter, r * http.Request,
 	}
 
 	err := apiCfg.DB.DeleteURL(r.Context(), database.DeleteURLParams{
-		UserID: user.ID,
+		UserID:   user.ID,
 		ShortUrl: query,
 	})
 
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest,  "could not delete short url")
-		return 
+		log.Println(err)
+		respondWithError(w, http.StatusBadRequest, "could not delete short url")
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (apiCfg *apiConfig) putShortURL(w http.ResponseWriter, r *http.Request, user database.User) {
+	query := r.PathValue("shortUrl")
+
+	if query == "" {
+		respondWithError(w, http.StatusBadGateway, "no short url supplied")
+		return
+	}
+
+	payload := LongURLRequest{}
+
+	err := json.NewDecoder(r.Body).Decode(&payload)
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+	}
+
+	err = apiCfg.DB.UpdateShortURL(r.Context(), database.UpdateShortURLParams{
+		UserID:   user.ID,
+		ShortUrl: query,
+		LongUrl:  payload.LongURL,
+	})
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not update long url")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, ShortURLUpdateResponse{
+		LongURL:  payload.LongURL,
+		ShortURL: query,
+	})
 }
 
 func (apiCfg *apiConfig) postAPIUsers(w http.ResponseWriter, r *http.Request) {

@@ -42,7 +42,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/data/shorten", apiCfg.authenticationMiddlewear(apiCfg.postLongURL))
 	mux.HandleFunc("GET /api/v1/{shortUrl}", apiCfg.getShortURL)
 	mux.HandleFunc("DELETE /api/v1/{shortUrl}", apiCfg.authenticationMiddlewear(apiCfg.deleteShortURL))
-
+	mux.HandleFunc("PUT /api/v1/{shortUrl}", apiCfg.authenticationMiddlewear(apiCfg.putShortURL))
 
 	// user management endpoints
 	mux.HandleFunc("POST /api/v1/users", apiCfg.postAPIUsers)

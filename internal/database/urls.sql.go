@@ -79,3 +79,21 @@ func (q *Queries) SelectURL(ctx context.Context, shortUrl string) (Url, error) {
 	)
 	return i, err
 }
+
+const updateShortURL = `-- name: UpdateShortURL :exec
+UPDATE urls
+SET long_url = $1
+WHERE user_id = $2 AND 
+short_url = $3
+`
+
+type UpdateShortURLParams struct {
+	LongUrl  string
+	UserID   int32
+	ShortUrl string
+}
+
+func (q *Queries) UpdateShortURL(ctx context.Context, arg UpdateShortURLParams) error {
+	_, err := q.db.ExecContext(ctx, updateShortURL, arg.LongUrl, arg.UserID, arg.ShortUrl)
+	return err
+}
