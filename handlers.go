@@ -227,6 +227,11 @@ func (apiCfg *apiConfig) postAPIUsers(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: now,
 	})
 
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, http.StatusInternalServerError, "could not create user in database")
+	}
+
 	respondWithJSON(w, http.StatusCreated, APIUserResponseNoToken{
 		ID:    user.ID,
 		Email: user.Email,

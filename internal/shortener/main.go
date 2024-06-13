@@ -9,9 +9,7 @@ import (
 const urlHashPostfix = "Xa1"
 
 func Hash(inputString string, postfixCount int) string {
-	var hash [16]byte
-
-	hash = md5.Sum([]byte(inputString + strings.Repeat(urlHashPostfix, postfixCount)))
+	hash := md5.Sum([]byte(inputString + strings.Repeat(urlHashPostfix, postfixCount)))
 
 	return hex.EncodeToString(hash[:])
 }
