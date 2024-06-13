@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -71,6 +72,11 @@ func (apiCfg *apiConfig) authenticationMiddlewear(handler authedHandeler) http.H
 		}
 
 		user, err := apiCfg.DB.SelectUserByID(r.Context(), int32(userIDStr))
+
+		if err != nil {
+			log.Println(err)
+			respondWithError(w, http.StatusUnauthorized, "could not find user in database")
+		}
 
 		handler(w, r, user)
 	})
