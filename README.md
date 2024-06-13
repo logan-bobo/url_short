@@ -39,7 +39,7 @@ The security considerations around the use of JWTs are:
 - The JWT signing secret my remain secure, I would look to store this in some secret storage platform such as 
 Hashicorp Vault or AWS Secrets Manager.
 
-```
+```mermaid
 sequenceDiagram
     participant Client
     participant Server
