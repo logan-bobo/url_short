@@ -45,7 +45,7 @@ Response:
 
 Parameters:
 - Headers
-    - `Authorization: Baerer <token>`
+    - `Authorization: Bearer <token>`
 
 ### `GET /api/v1/{shortUrl}`
 Description: Redirects an unauthenticated client from the short URL to the long URL.
@@ -105,7 +105,7 @@ Request:
 
 Parameters:
 - Headers
-    - `Authorization: Baerer <token>`
+    - `Authorization: Bearer <token>`
 
 Response:
 ```
@@ -140,7 +140,7 @@ Description: Uses a refresh token to refresh an access token
 
 Parameters:
 - Headers
-    - `Authorization: Baerer <refresh token>` 
+    - `Authorization: Bearer <refresh token>` 
 
 Response:
 ```
