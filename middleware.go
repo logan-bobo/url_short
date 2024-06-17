@@ -12,7 +12,7 @@ import (
 
 type authedHandeler func(http.ResponseWriter, *http.Request, database.User)
 
-func (apiCfg *apiConfig) authenticationMiddlewear(handler authedHandeler) http.HandlerFunc {
+func (apiCfg *apiConfig) authenticationMiddleware(handler authedHandeler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 
