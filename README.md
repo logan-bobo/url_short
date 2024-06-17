@@ -8,6 +8,7 @@ This service provides the capability to use the unique key to access the origina
 - **CRUD Operations**: Clients can create, read, update and delete their own links.
 
 ## High Level Design
+
 ```mermaid
 sequenceDiagram
     participant Client
@@ -17,6 +18,55 @@ sequenceDiagram
     Server ->> Client: HTTP/301 permanent redirect to long URL
     Client ->> Destination Server: redirected to long URL
 ```
+## API Endpoints
+
+### `GET /api/v1/healthz` 
+Description: The health endpoint for the API used for health checks.
+
+Response:
+`200 OK`: The server is healthy and ready to respond to requests.
+
+
+### `POST /api/v1/data/shorten` 
+Description: Used to turn a long URL into a short URL.
+Request:
+```
+{
+    "long_url":"https://www.google.com/my/long/path"
+}
+```
+Response:
+```
+{
+    "short_url":"<short url hash>"
+}
+```
+`201 Created`: The short URL to long URL mapping has been created in the database.
+
+### `GET /api/v1/{shortUrl}`
+Description: Redirects an unauthenticated client from the short URL to the long URL.
+
+Parameters: 
+- Path 
+    - `shortUrl` a reference to a short URL in that is stored in the database. 
+    
+
+- `DELTE /api/v1/{shortUrl}` 
+Description: An authenticated endpoint that will delete a short URL a user owns.
+
+Parameters:
+- Path
+    - `shortUrl` a reference to a short URL that is stored in the database.
+- Headers
+    - `Authorization: Bearer <token>`
+
+### `PUT /api/v1/{shortUrl}`
+Description: Allows for the updating of a long URL based on a short URL
+Parameters:
+- Path 
+    - `shortUrl` a reference to a short URL in the database
+- Headers
+    - `Authorization: Bearer <token>`
 
 ## Hash Functionality
 
