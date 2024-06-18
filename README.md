@@ -19,6 +19,18 @@ sequenceDiagram
     Client ->> Destination Server: redirected to long URL
 ```
 
+## Low Level Design
+
+!(system design)[./doc/arch.png]
+
+1. The client will resolve our load balancer hostname via DNS
+2. The load balancer will forward our requests to a series of back end servers
+3. If the short URL is already in the cache return its long URL
+4. On cache miss look up the long URL from database
+5. Long URL is returned to the user with a redirect
+
+A breakdown of the API endpoints can be found (here)[./doc/endpoints.md]
+
 ## Hash Functionality
 
 Keeping the hash length short is important while allowing us to store a large number of unique short URLs. 
@@ -80,134 +92,4 @@ sequenceDiagram
     Server-->>Client: new access token (1 hour)
 
     Note over Client: refresh token expires
-```
-## API Endpoints
-
-### `GET /api/v1/healthz` 
-Description: The health endpoint for the API used for health checks.
-
-Response:
-`200 OK`: The server is healthy and ready to respond to requests.
-
-### `POST /api/v1/data/shorten` 
-Description: Used to turn a long URL into a short URL.
-
-Request:
-```
-{
-    "long_url":"https://www.google.com/my/long/path"
-}
-```
-
-Response:
-```
-{
-    "short_url":"<short url hash>"
-}
-```
-
-Parameters:
-- Headers
-    - `Authorization: Bearer <token>`
-
-### `GET /api/v1/{shortUrl}`
-Description: Redirects an unauthenticated client from the short URL to the long URL.
-
-Parameters: 
-- Path 
-    - `shortUrl` a reference to a short URL in that is stored in the database.     
-
-- `DELTE /api/v1/{shortUrl}` 
-
-Description: An authenticated endpoint that will delete a short URL a user owns.
-
-Parameters:
-- Path
-    - `shortUrl` a reference to a short URL that is stored in the database.
-- Headers
-    - `Authorization: Bearer <token>`
-
-### `PUT /api/v1/{shortUrl}`
-Description: Allows for the updating of a long URL based on a short URL
-
-Parameters:
-- Path 
-    - `shortUrl` a reference to a short URL in the database
-- Headers
-    - `Authorization: Bearer <token>`
-
-### `POST /api/v1/users`
-Description: Creates a user to be used by a client
-
-Request:
-```
-{
-    "email":"<client email>",
-    "password:"<client password>"
-}
-```
-
-Response:
-```
-{
-    "id":"<client id>",
-    "email":"<client email>"
-}
-```
-
-### `PUT /api/v1/users`
-Description: Allows a user to update their email or password
-
-Request:
-```
-{
-    "email":"<client email>",
-    "password:"<client password>"
-}
-```
-
-Parameters:
-- Headers
-    - `Authorization: Bearer <token>`
-
-Response:
-```
-{
-    "id":"<client id>",
-    "email":"<client email>"
-}
-```
-
-### `POST /api/v1/login`
-Description: Allows a client to login by returning a access and refresh token
-
-Request:
-```
-{
-    "email":"<client email>",
-    "password:"<client password>"
-}
-```
-
-Response:
-```
-{
-    "id": "<client id>"
-    "email":"<client email>"
-    "token":"<client access token>"
-    "refresh_token":"<client refresh token>"
-}
-```
-### `POST /api/v1/refresh`
-Description: Uses a refresh token to refresh an access token 
-
-Parameters:
-- Headers
-    - `Authorization: Bearer <refresh token>` 
-
-Response:
-```
-{
-    "token":"<client access token>"
-}
 ```
