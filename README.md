@@ -20,8 +20,7 @@ sequenceDiagram
 ```
 
 ## Low Level Design
-
-!(system design)[./doc/arch.png]
+![system design](./doc/arch.png)
 
 1. The client will resolve our load balancer hostname via DNS
 2. The load balancer will forward our requests to a series of back end servers
@@ -29,7 +28,7 @@ sequenceDiagram
 4. On cache miss look up the long URL from database
 5. Long URL is returned to the user with a redirect
 
-A breakdown of the API endpoints can be found (here)[./doc/endpoints.md]
+A breakdown of the API endpoints can be found [here](./doc/endpoints.md)
 
 ## Hash Functionality
 
