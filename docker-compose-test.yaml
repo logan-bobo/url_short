@@ -1,0 +1,10 @@
+version: '3.1'
+
+services:
+  api:
+    image: url-short:test
+    env_file:
+      - .env
+    volumes:
+    - ./:/opt/url-short
+

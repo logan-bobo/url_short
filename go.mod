@@ -1,6 +1,6 @@
 module url-short
 
-go 1.22.3
+go 1.22.4
 
 require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect

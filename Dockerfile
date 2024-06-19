@@ -2,17 +2,10 @@ FROM alpine:3.20.0 AS base
 
 RUN apk update
 RUN apk upgrade
-RUN apk add --update go=1.22.3-r0 
-
-FROM base AS tester
-
-WORKDIR /opt/url-short
-
-ADD . /opt/url-short
-
-CMD ["go", "test"]
 
 FROM base AS builder
+
+RUN apk add --update go=1.22.4-r0
 
 WORKDIR /build
 
@@ -20,7 +13,15 @@ ADD . /build
 
 RUN go build -o main .
 
-FROM builder AS production
+FROM base AS tester
+
+RUN apk add --update go=1.22.4-r0
+
+RUN wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.59.1
+
+WORKDIR /opt/url-short/
+
+FROM base AS production
 
 WORKDIR /opt/url-short/
 
