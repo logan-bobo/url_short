@@ -22,7 +22,7 @@ import (
 )
 
 type apiConfig struct {
-		DB        *database.Queries
+	DB        *database.Queries
 	RDB       *redis.Client
 	JWTSecret string
 }
