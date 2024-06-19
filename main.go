@@ -5,14 +5,17 @@ import (
 	"log"
 	"net/http"
 	"os"
+
 	"url-short/internal/database"
 
 	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
 	serverPort := os.Getenv("SERVER_PORT")
 	dbURL := os.Getenv("PG_CONN")
+	rdbURL := os.Getenv("RDB_CONN")
 	jwtSecret := os.Getenv("JWT_SECRET")
 
 	db, err := sql.Open("postgres", dbURL)
@@ -30,8 +33,17 @@ func main() {
 		Handler: mux,
 	}
 
+	opt, err := redis.ParseURL(rdbURL)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	redisClient := redis.NewClient(opt)
+
 	apiCfg := apiConfig{
 		DB:        dbQueries,
+		RDB:       redisClient,
 		JWTSecret: jwtSecret,
 	}
 

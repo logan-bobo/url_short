@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 
 	"url-short/internal/database"
@@ -22,6 +23,7 @@ import (
 
 type apiConfig struct {
 	DB        *database.Queries
+	RDB       *redis.Client
 	JWTSecret string
 }
 
@@ -64,11 +66,9 @@ type APIUserResponseNoToken struct {
 }
 
 func (apiCfg *apiConfig) healthz(w http.ResponseWriter, r *http.Request) {
-	payload := HealthResponse{
+	respondWithJSON(w, http.StatusOK, HealthResponse{
 		Status: "ok",
-	}
-
-	respondWithJSON(w, http.StatusOK, payload)
+	})
 }
 
 func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request, user database.User) {
@@ -125,15 +125,60 @@ func (apiCfg *apiConfig) getShortURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row, err := apiCfg.DB.SelectURL(r.Context(), query)
+	cacheVal, err := apiCfg.RDB.Get(r.Context(), query).Result()
 
-	if err != nil {
+	switch {
+	case err == redis.Nil:
+		log.Printf("cache miss, key %s does not exists, writing to redis", query)
+
+		row, err := apiCfg.DB.SelectURL(r.Context(), query)
+
+		if err != nil {
+			log.Println(err)
+			respondWithError(w, http.StatusInternalServerError, "database error")
+			return
+		}
+
+		err = apiCfg.RDB.Set(r.Context(), query, row.LongUrl, (time.Hour * 1)).Err()
+
+		if err != nil {
+			log.Printf("could not write to redis cache %s", err)
+		}
+
+		http.Redirect(w, r, row.LongUrl, http.StatusMovedPermanently)
+		return
+
+	case err != nil:
 		log.Println(err)
-		respondWithError(w, http.StatusInternalServerError, "database error")
+
+		row, err := apiCfg.DB.SelectURL(r.Context(), query)
+
+		if err != nil {
+			log.Println(err)
+			respondWithError(w, http.StatusInternalServerError, "database error")
+			return
+		}
+
+		http.Redirect(w, r, row.LongUrl, http.StatusMovedPermanently)
+		return
+
+	case cacheVal == "":
+		log.Printf("key %s does not have a value", query)
+
+		row, err := apiCfg.DB.SelectURL(r.Context(), query)
+
+		if err != nil {
+			log.Println(err)
+			respondWithError(w, http.StatusInternalServerError, "database error")
+			return
+		}
+
+		http.Redirect(w, r, row.LongUrl, http.StatusMovedPermanently)
 		return
 	}
 
-	http.Redirect(w, r, row.LongUrl, http.StatusMovedPermanently)
+	log.Printf("cache hit for key %s", cacheVal)
+	http.Redirect(w, r, cacheVal, http.StatusMovedPermanently)
 }
 
 func (apiCfg *apiConfig) deleteShortURL(w http.ResponseWriter, r *http.Request, user database.User) {
@@ -183,6 +228,12 @@ func (apiCfg *apiConfig) putShortURL(w http.ResponseWriter, r *http.Request, use
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "could not update long url")
 		return
+	}
+
+	err = apiCfg.RDB.Set(r.Context(), query, payload.LongURL, (time.Hour * 1)).Err()
+
+	if err != nil {
+		log.Println(err)
 	}
 
 	respondWithJSON(w, http.StatusOK, ShortURLUpdateResponse{

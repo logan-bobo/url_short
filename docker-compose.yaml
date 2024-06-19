@@ -33,5 +33,11 @@ services:
       interval: 2s
       timeout: 5s
       retries: 10
+  redis:
+    image: 'bitnami/redis:latest'
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - 5003:6379
 volumes:
   pgdata:
