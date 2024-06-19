@@ -66,11 +66,9 @@ type APIUserResponseNoToken struct {
 }
 
 func (apiCfg *apiConfig) healthz(w http.ResponseWriter, r *http.Request) {
-	payload := HealthResponse{
+	respondWithJSON(w, http.StatusOK, HealthResponse{
 		Status: "ok",
-	}
-
-	respondWithJSON(w, http.StatusOK, payload)
+	})
 }
 
 func (apiCfg *apiConfig) postLongURL(w http.ResponseWriter, r *http.Request, user database.User) {
@@ -141,7 +139,7 @@ func (apiCfg *apiConfig) getShortURL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = apiCfg.RDB.Set(r.Context(), query, row.LongUrl, (time.Hour * 24)).Err()
+		err = apiCfg.RDB.Set(r.Context(), query, row.LongUrl, (time.Hour * 1)).Err()
 
 		if err != nil {
 			log.Printf("could not write to redis cache %s", err)
@@ -230,6 +228,12 @@ func (apiCfg *apiConfig) putShortURL(w http.ResponseWriter, r *http.Request, use
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "could not update long url")
 		return
+	}
+
+	err = apiCfg.RDB.Set(r.Context(), query, payload.LongURL, (time.Hour * 1)).Err()
+
+	if err != nil {
+		log.Println(err)
 	}
 
 	respondWithJSON(w, http.StatusOK, ShortURLUpdateResponse{
